@@ -1,0 +1,122 @@
+﻿@page "/interact/{id}"
+
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@using Client.Data.Agents
+@inject Services.AgentService agentService
+@inject Hubs.Agents.AmberHub Hub
+@using Microsoft.AspNetCore.SignalR.Client
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+
+    @if (_agent is not null)
+    {
+        <MudStack>
+            <MudPaper Class="pa-4">
+                <MudStack Row="true">
+                    <MudTextField @bind-Value="@inputText" Label="Standard" Variant="Variant.Text" Margin="Margin.Dense"></MudTextField>
+                    <MudButton Color="Color.Primary" OnClick="@Send">Send</MudButton>
+                </MudStack>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mud-height-full">
+                <MudStack Spacing="4">
+                    @foreach (var task in currentAgentTaskResults)
+                    {
+                        <div>@((MarkupString)task.Result)</div>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+
+    [Parameter]
+    public string Id { get; set; }
+
+    private Agent _agent;
+
+    private string inputText = string.Empty;
+    private List<AgentTaskResult> currentAgentTaskResults = new();
+
+    private HubConnection _hubConnection;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        _agent = await agentService.GetAgentsById(apiHost, Id);
+    }
+
+    private async Task Send()
+    {
+        string[] words = inputText.Split(' ');
+        int firstSpaceIndex = inputText.IndexOf(' ');
+
+        string firstWord = words[0];
+
+        string restOfWords = inputText.Substring(firstSpaceIndex + 1);
+
+        AgentTask newTask = new AgentTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                AgentId = _agent.Id,
+                Command = firstWord,
+                Arguments = restOfWords
+            };
+
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        await agentService.SendAgentTask(apiHost, newTask);
+    }
+
+    protected override void OnInitialized()
+    {
+        AgentTaskResultReceived += OnAgentTaskResultReceived;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl($"http://{apiHost}/AmberHub")
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<string>("AgentTaskResult", OnAgentTaskResult);
+
+        await _hubConnection.StartAsync();
+    }
+
+    // Метод вызывается при получении результатов от SignalR
+    private async Task OnAgentTaskResult(string id)
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        var taskResult = await agentService.GetAgentTaskResult(apiHost, id);
+
+        var resultText = taskResult.Result.Replace("\r\n", "<br>");
+
+        taskResult.Result = resultText;
+        currentAgentTaskResults.Add(taskResult);
+
+        // Вызываем метод для оповещения других компонентов об обновленных данных
+        NotifyAgentTaskResultReceived();
+    }
+
+    // Метод для оповещения других компонентов об обновленных данных
+    private void NotifyAgentTaskResultReceived()
+    {
+        // Вызываем событие, чтобы обновить данные в других компонентах
+        AgentTaskResultReceived?.Invoke(this, currentAgentTaskResults);
+    }
+
+    // Обработчик события для обновления данных в компоненте при получении новых результатов от SignalR
+    private void OnAgentTaskResultReceived(object sender, List<AgentTaskResult> newAgentTaskResults)
+    {
+        currentAgentTaskResults = newAgentTaskResults;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public event EventHandler<List<AgentTaskResult>> AgentTaskResultReceived;
+}

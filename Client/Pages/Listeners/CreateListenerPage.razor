@@ -1,0 +1,64 @@
+﻿@inject Services.Listeners.ListenerService listenerService;
+@inject Services.Listeners.ListenerTypeService listenerTypeService;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_success">
+
+            <MudItem xs="12" md="6">
+                <MudTextField Label="BindHost" @bind-Value="newListener.BindHost" Placeholder="Enter Bind Host" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudTextField Label="BindPort" @bind-Value="newListener.BindPort" Placeholder="Enter Bind Port" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSelect Dense="true" T="string" Label="Listener Types" Variant="Variant.Outlined" @bind-Value="newListener.ListenerTypeId">
+                    @foreach (var item in listenerTypes)
+                    {
+                        <MudSelectItem TValue="string" Value="@item.Id">@item.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+        </MudForm>
+        <DialogActions>
+                <MudButton OnClick="Cancel">Cancel</MudButton>
+                <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+        </DialogActions>
+    </DialogContent>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    public MudDialogInstance MudDialog { get; set; }
+
+    private MudForm _form;
+    private bool _success;
+
+    private Data.Listeners.Listener newListener = new Data.Listeners.Listener() ;
+
+    private List<Data.Listeners.ListenerType> listenerTypes = new List<Data.Listeners.ListenerType>();
+    private string apiHost;
+
+    protected override async Task OnInitializedAsync()
+    {
+        apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        listenerTypes = await listenerTypeService.GetListenerTypes(apiHost);
+    }
+
+    private async Task Submit()
+    {
+        newListener.Id = Guid.NewGuid().ToString();
+        await listenerService.CreateListener(apiHost, newListener);
+
+        MudDialog.Close(DialogResult.Ok(true));
+
+    }
+    private void Cancel() => MudDialog.Cancel();
+}

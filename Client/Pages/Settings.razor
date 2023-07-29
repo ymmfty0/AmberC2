@@ -1,0 +1,46 @@
+﻿@page "/settings"
+
+@layout MainLayout
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Hubs.Agents.AmberHub Hub
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="justify-center pt-8">
+    <MudForm @ref="_form">
+        <MudTextField T="string" Label="Server" @bind-Value="@apiHost" Required="true" Immediate="@true" RequiredError="Server IP/hostname is required!" />
+
+        <div class="d-flex">
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-8"
+                       OnClick="SaveApiHost">Save</MudButton>
+        </div>
+    </MudForm>
+</MudContainer>
+
+@code {
+    private string apiHost;
+
+    private MudForm _form;
+
+    protected override async Task OnInitializedAsync()
+    {
+        apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        if (!string.IsNullOrEmpty(apiHost))
+        {
+            Initialize(apiHost);
+        }
+    }
+
+    private async Task SaveApiHost()
+    {
+        await LocalStorage.SetItemAsync("apihost", apiHost);
+        var host = await LocalStorage.GetItemAsync<string>("apihost");
+        Initialize(host);
+
+    }
+
+    private async Task Initialize(string apiHost)
+    {
+        Hub.Connect(apiHost);
+    }
+
+}

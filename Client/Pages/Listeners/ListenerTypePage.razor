@@ -1,0 +1,44 @@
+﻿@page "/listener-types"
+
+@using Client.Data.Listeners
+@inject Services.Listeners.ListenerTypeService listenerTypeService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+
+<h1>Listener Types</h1>
+
+@if (listenerTypes == null)
+{
+	<p><em>Loading...</em></p>
+}
+else
+{
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Name</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var listenerType in listenerTypes)
+			{
+				<tr>
+					<td>@listenerType.Id</td>
+					<td>@listenerType.Name</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+@code {
+    private List<ListenerType> listenerTypes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        listenerTypes = await listenerTypeService.GetListenerTypes(apiHost);
+    }
+
+}

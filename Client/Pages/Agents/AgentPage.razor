@@ -1,0 +1,118 @@
+﻿@page "/agents"
+
+@using Client.Data.Agents;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Services.AgentService agentService
+@inject Hubs.Agents.AmberHub Hub
+@inject ISnackbar Snackbar
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+    <div class="mt-2">
+        <MudTable Items="@_agents" @key="_agents" Hover="true" Loading="@_loading" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Id</MudTh>
+                <MudTh>Hostname</MudTh>
+                <MudTh>Username</MudTh>
+                <MudTh>ProcessName</MudTh>
+                <MudTh>ProcessId</MudTh>
+                <MudTh>Architecture</MudTh>
+                <MudTh>Integrity</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="BindHost">@context.Hostname</MudTd>
+                <MudTd DataLabel="BindHost">@context.Username</MudTd>
+                <MudTd DataLabel="BindHost">@context.ProcessName</MudTd>
+                <MudTd DataLabel="BindHost">@context.ProcessId</MudTd>
+                <MudTd DataLabel="BindHost">@context.Architecture</MudTd>
+                <MudTd DataLabel="BindHost">@context.Integrity</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Filled.Terminal" aria-label="interact" Title="Interact"
+                           OnClick="@(()=> InteractWithDrone(context))"/>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                No Agents
+            </NoRecordsContent>
+        </MudTable>
+    </div>
+</MudContainer>
+
+
+
+@code {
+    private List<Agent> _agents = new();
+
+    private bool _loading;
+    private HubConnection _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl($"http://{apiHost}/AmberHub")
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<string>("NewAgent", OnNewAgentReceived);
+        await _hubConnection.StartAsync();
+
+        var agents = await agentService.GetAgents(apiHost);
+
+        _agents.Clear();
+        _agents.AddRange(agents);
+    }
+
+    protected override void OnInitialized()
+    {
+        AgentRecivied += OnAgentReceived;
+    }
+
+    private async Task OnNewAgentReceived(string id)
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+        var agents = await agentService.GetAgents(apiHost);
+
+        _agents.Clear();
+        _agents.AddRange(agents);
+
+        Snackbar.Add($"New Agent {id}", Severity.Success);
+
+        NotifyAgentReceived();
+    }
+
+    private void OnAgentReceived(object sender, List<Agent> newAgents)
+    {
+        _agents = newAgents;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void NotifyAgentReceived()
+    {
+        // Вызываем событие, чтобы обновить данные в других компонентах
+        AgentRecivied?.Invoke(this, _agents);
+    }
+
+    private void InteractWithDrone(Agent agent)
+    {
+        Nav.NavigateTo($"/interact/{agent.Id}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    public event EventHandler<List<Agent>> AgentRecivied;
+
+}

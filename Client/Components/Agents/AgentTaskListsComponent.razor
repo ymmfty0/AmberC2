@@ -1,0 +1,43 @@
+﻿@page "/agent-tasks"
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Services.AgentService agentService
+@using Client.Data.Agents
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+    <div class="mt-2">
+        <MudTable Items="@_tasks" Hover="true" Loading="@_loading" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Id</MudTh>
+                <MudTh>AgentId</MudTh>
+                <MudTh>Command</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="AgentId">@context.AgentId</MudTd>
+                <MudTd DataLabel="Command">@context.Command</MudTd>
+                <MudTd DataLabel="Status">@context.Status</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                No Tasks
+            </NoRecordsContent>
+        </MudTable>
+    </div>
+</MudContainer>
+
+
+@code {
+
+    private bool _loading;
+
+    private List<AgentTask> _tasks = new();
+    private List<AgentTaskResult> _tasksResult = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        _tasks = await agentService.GetAgentsTasks(apiHost);
+    }
+
+}

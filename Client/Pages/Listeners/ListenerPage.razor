@@ -1,0 +1,108 @@
+﻿@page "/listeners"
+
+@using Client.Data.Listeners
+@inject Services.Listeners.ListenerService listenerService
+@inject Services.Listeners.ListenerTypeService listenerTypeService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+     <div class="mt-2">
+        <MudTable Items="@_listeners" Hover="true" Loading="@_loading" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Id</MudTh>
+                <MudTh>BindHost</MudTh>
+                <MudTh>BindPort</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Id">@context.Id</MudTd>
+                    <MudTd DataLabel="BindHost">@context.BindHost</MudTd>
+                    <MudTd DataLabel="BindPort">@context.BindPort</MudTd>
+                    <MudTd DataLabel="ListenerTypeId">@listenerTypes.FirstOrDefault(i => i.Id == context.ListenerTypeId).Name</MudTd>
+                    <MudTd>
+                        <MudTooltip Text="Delete">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Size="Size.Medium"
+                                           Color="@Color.Error" OnClick="@(async () => await DeleteListener(context.Id))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    No Listeners
+                </NoRecordsContent>
+        </MudTable>
+    </div>
+   
+        <MudTooltip Text="Add Listener">
+            <div class="mt-2">
+            <MudButton @onclick="OpenCreateListener" disabled="@_canCreate" Variant="Variant.Filled" Color="Color.Primary">Create</MudButton>
+            </div>
+        </MudTooltip>
+</MudContainer>
+ 
+<style>
+    .background-blur {
+        backdrop-filter: blur(10px);
+    }
+</style>
+
+@code {
+
+    private readonly List<Listener> _listeners = new();
+    private List<ListenerType> listenerTypes = new();
+
+    private bool _hidePosition;
+    private bool _loading;
+    private bool _canCreate;
+
+    
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListeners();
+        _canCreate = (listenerTypes.Count == 0);
+    }
+
+    private async Task LoadListeners()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        var listeners = await listenerService.GetListeners(apiHost);
+
+        _listeners.Clear();
+        _listeners.AddRange(listeners);
+
+        foreach (var listener in _listeners)
+        {
+            var listenerType = await listenerTypeService.GetListenerTypeById(listener.ListenerTypeId, apiHost);
+            listenerTypes.Add(listenerType);
+        }
+    }
+
+    private async Task DeleteListener(string listenerId)
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+        await listenerService.DeleteListener(listenerId, apiHost);
+        // Обновление списка после удаления
+        var listeners = await listenerService.GetListeners(apiHost);
+        _listeners.Clear();
+        _listeners.AddRange(listeners);
+
+    }
+
+    private async Task OpenCreateListener()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Medium, ClassBackground = "background-blur" };
+        var dialog = await DialogService.ShowAsync<CreateListenerPage>("", options);
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadListeners();
+        }
+    }
+   
+}

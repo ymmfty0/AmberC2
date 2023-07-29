@@ -1,0 +1,62 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+
+<MudThemeProvider Theme="darkTheme" />
+<MudDialogProvider DisableBackdropClick="true" CloseOnEscapeKey="false" NoHeader="true" />
+<MudSnackbarProvider/>
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3">AmberC&C</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Filled.MenuBook" Color="Color.Inherit" Edge="Edge.End" 
+                       OnClick="GoToDocumentation" Title="For information"/>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="@_drawerOpen" Elevation="1" Variant="@DrawerVariant.Mini">
+            <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+
+    private bool _drawerOpen = false;
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private static async Task GoToDocumentation()
+    {
+        var uri = new Uri("https://t.me/ymmfy0");
+        await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+    }
+
+    MudTheme darkTheme = new MudTheme()
+        {
+            Palette = new Palette()
+            {
+                Black = "#27272f",
+                Background = "#32333d",
+                BackgroundGrey = "#27272f",
+                Surface = "#373740",
+                DrawerBackground = "#27272f",
+                DrawerText = "rgba(255,255,255, 0.50)",
+                DrawerIcon = "rgba(255,255,255, 0.50)",
+                AppbarBackground = "#27272f",
+                AppbarText = "rgba(255,255,255, 0.70)",
+                TextPrimary = "rgba(255,255,255, 0.70)",
+                TextSecondary = "rgba(255,255,255, 0.50)",
+                ActionDefault = "#adadb1",
+                ActionDisabled = "rgba(255,255,255, 0.26)",
+                ActionDisabledBackground = "rgba(255,255,255, 0.12)"
+            }
+        };
+
+}
