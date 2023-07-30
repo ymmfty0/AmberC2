@@ -1,17 +1,20 @@
-﻿using Mono.Cecil;
+﻿using dnlib.DotNet;
+using Mono.Cecil;
 using Mono.Cecil.Cil;
+using System.Reflection;
 
 namespace TeamServer.Services.Implant
 {
     public static class ImplantGenerator
     {
 
-        public static byte[] GenerateImplant(byte[] fileBytes, string bindHost, string bindPort, string listenerType, string[] classNames)
+        public static async Task<byte[]> GenerateImplant(string bindHost, string bindPort, string listenerType, List<string> classNames)
         {
+            byte[] fileBytes = await GetEmbeddedResource("Implant.exe");
 
             var modifyedImplant = ModifyConfigFields(fileBytes, bindHost, bindPort, listenerType);
 
-            if (classNames == null || classNames.Length == 0)
+            if (classNames == null || classNames.Count == 0)
             {
                 return modifyedImplant;
             }
@@ -19,7 +22,7 @@ namespace TeamServer.Services.Implant
             return removeedCommandsImpalnt;
         }
 
-        private static byte[] RemoveClasses(byte[] fileBytes, string[] classNames)
+        private static byte[] RemoveClasses(byte[] fileBytes, List<string> classNames)
         {
 
             using (var memoryStream = new MemoryStream(fileBytes))
@@ -91,6 +94,48 @@ namespace TeamServer.Services.Implant
                     return modifiedMemoryStream.ToArray();
                 }
             }
+        }
+
+        public static async Task<List<string>> GetlAllCommandClasses()
+        {
+            byte[] fileBytes = await GetEmbeddedResource("Implant.exe");
+
+            using (var memoryStream = new MemoryStream(fileBytes))
+            {
+
+                AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(memoryStream);
+                ModuleDefinition module = assembly.MainModule;
+
+                List<TypeDefinition> allCommandClasses = module.Types
+                    .Where(type => type.Namespace == "Implant.Commands")
+                    .ToList();
+
+                List<string> typeNames = new List<string>();
+
+                foreach (TypeDefinition typeDef in allCommandClasses)
+                {
+                    if (typeDef.Name == "Command") continue;
+                    typeNames.Add(typeDef.Name);
+                }
+
+                return typeNames;
+            }
+        }
+
+        private static async Task<byte[]> GetEmbeddedResource(string resourceName)
+        {
+            string fullResourceName = $"TeamServer.Stagers.{resourceName}";
+
+            Assembly assembly = Assembly.GetExecutingAssembly();
+            await using var rs = assembly.GetManifestResourceStream(fullResourceName);
+
+            if (rs is null)
+                return Array.Empty<byte>();
+
+            await using var ms = new MemoryStream();
+            await rs.CopyToAsync(ms);
+
+            return ms.ToArray(); ;
         }
     }
 

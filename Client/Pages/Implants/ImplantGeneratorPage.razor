@@ -1,7 +1,94 @@
 ﻿@page "/implants"
 
-<h3>ImplantGeneratorPage</h3>
+@using Client.Data.Implants;
+@using Client.Services.Api
+@using Client.Data.Listeners
+@inject Services.ApiService apiService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+    <div class="mt-2">
+        <MudTable Items="@_implants" Hover="true" LoadingProgressColor="Color.Info">
+            <HeaderContent>
+                <MudTh>Id</MudTh>
+                <MudTh>FileName</MudTh>
+                <MudTh>ListenerId</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Id">@context.Id</MudTd>
+                <MudTd DataLabel="BindHost">@context.FileName</MudTd>
+                <MudTd DataLabel="BindPort">@context.ListenerId</MudTd>
+                <MudTd>
+                    <MudTooltip Text="Download">
+                        <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Medium"
+                                       Color="@Color.Primary" OnClick="@(async () => await DownloadImplant(context.Id))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                No Implants
+            </NoRecordsContent>
+        </MudTable>
+    </div>
+
+    <MudTooltip Text="Generate Implant">
+        <div class="mt-2">
+            <MudButton @onclick="GenerateImplant" Variant="Variant.Filled" Color="Color.Primary">Generate Implant</MudButton>
+        </div>
+    </MudTooltip>
+</MudContainer>
+
+<style>
+    .background-blur {
+        backdrop-filter: blur(10px);
+    }
+</style>
 
 @code {
+
+    private List<Listener> _listeners = new();
+    private List<Implant> _implants = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadImplants();
+    }
+
+    private async Task LoadImplants()
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+
+        var implants = await apiService.GetGeneratedImplants(apiHost);
+        _implants.Clear();
+        _implants.AddRange(implants);
+
+    }
+
+    private async Task DownloadImplant(string implantId)
+    {
+        string apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+        var downloadLink = $"http://{apiHost}{ApiList.GET_IMPLANTS}/{implantId}";
+        NavigationManager.NavigateTo(downloadLink, true);
+
+    }
+
+    private async Task GenerateImplant()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Medium, ClassBackground = "background-blur" };
+        var dialog = await DialogService.ShowAsync<GenerateImplant>("", options);
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadImplants();
+        }
+    }
 
 }

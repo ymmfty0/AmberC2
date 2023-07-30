@@ -27,7 +27,7 @@ namespace Client
 
             builder.Services.AddSingleton<ListenerService>();
 			builder.Services.AddSingleton<ListenerTypeService>();
-			builder.Services.AddSingleton<AgentService>();
+			builder.Services.AddSingleton<ApiService>();
 			builder.Services.AddSingleton<AmberHub>();
 
             builder.Services.AddBlazoredLocalStorage();
